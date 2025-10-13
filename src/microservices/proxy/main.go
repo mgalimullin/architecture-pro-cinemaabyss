@@ -60,6 +60,35 @@ func main() {
 		io.Copy(w, resp.Body)
 	})
 
+	http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+		target := monolithURL
+
+		log.Printf("➡️  Proxying request to: %s", target)
+
+		proxyReq, err := http.NewRequest(r.Method, target+"/api/users", r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		proxyReq.Header = r.Header.Clone()
+		client := &http.Client{}
+		resp, err := client.Do(proxyReq)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		for key, values := range resp.Header {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
+	})
+
 	log.Printf("🚀 Proxy service started on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
