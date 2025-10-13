@@ -43,13 +43,13 @@ spec:
           {{- toYaml .Values.eventsService.resources | nindent 10 }}
         readinessProbe:
           httpGet:
-            path: /api/movies/health
+            path: /api/events/health
             port: {{ .Values.eventsService.service.targetPort }}
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /api/movies/health
+            path: /api/events/health
             port: {{ .Values.eventsService.service.targetPort }}
           initialDelaySeconds: 15
           periodSeconds: 20
