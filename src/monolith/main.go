@@ -50,20 +50,23 @@ func main() {
 	initDB()
 	defer db.Close()
 
+	mux := http.NewServeMux()
 	// Set up HTTP routes
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/api/users", handleUsers)
-	http.HandleFunc("/api/movies", handleMovies)
-	http.HandleFunc("/api/payments", handlePayments)
-	http.HandleFunc("/api/subscriptions", handleSubscriptions)
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/api/users", handleUsers)
+	mux.HandleFunc("/api/movies", handleMovies)
+	mux.HandleFunc("/api/payments", handlePayments)
+	mux.HandleFunc("/api/subscriptions", handleSubscriptions)
 
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	loggedMux := loggingMiddleware(mux)
+	
 	log.Printf("Starting server on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, loggedMux))
 }
 
 func initDB() {
@@ -479,4 +482,31 @@ func createSubscription(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(s)
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Фиксируем время начала запроса
+		start := time.Now()
+
+		// Логируем информацию о запросе
+		log.Printf(
+			"[%s] %s %s (from %s)",
+			r.Method,
+			r.URL.Path,
+			r.URL.Query().Encode(), // параметры запроса (?id=123&...)
+			r.RemoteAddr,
+		)
+
+		// Вызываем следующий обработчик в цепочке
+		next.ServeHTTP(w, r)
+
+		// После обработки запроса логируем длительность
+		log.Printf(
+			"[%s] %s completed in %v",
+			r.Method,
+			r.URL.Path,
+			time.Since(start),
+		)
+	})
 }
