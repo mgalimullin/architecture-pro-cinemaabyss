@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -26,6 +24,7 @@ services:
   zookeeper:
     image: wurstmeister/zookeeper:latest
     container_name: cinemaabyss-zookeeper
+    platform: linux/amd64
     ports:
       - "2181:2181"
     networks:
@@ -35,6 +34,7 @@ services:
   kafka:
     image: wurstmeister/kafka:2.13-2.7.0
     container_name: cinemaabyss-kafka
+    platform: linux/amd64
     depends_on:
       - zookeeper
     ports:
@@ -57,7 +57,8 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-monolith
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -73,7 +74,8 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-movies-service
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
@@ -89,8 +91,10 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-events-service
     depends_on:
-      - postgres
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     ports:
       - "8082:8082"
     environment:

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -28,9 +29,14 @@ func main() {
 	initDB()
 	defer db.Close()
 
+	mux := http.NewServeMux()
+
 	// Set up HTTP routes
-	http.HandleFunc("/api/movies", handleMovies)
-	http.HandleFunc("/api/movies/health", handleHealth)
+	mux.HandleFunc("/api/movies", handleMovies)
+	mux.HandleFunc("/api/movies/health", handleHealth)
+
+	// Обертываем мультиплексор в middleware
+	loggedMux := loggingMiddleware(mux)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -38,7 +44,7 @@ func main() {
 		port = "8081" // Note: Using a different port than the monolith
 	}
 	log.Printf("Starting movies microservice on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, loggedMux))
 }
 
 func initDB() {
@@ -194,4 +200,31 @@ func createMovie(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(m)
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Фиксируем время начала запроса
+		start := time.Now()
+
+		// Логируем информацию о запросе
+		log.Printf(
+			"[%s] %s %s (from %s)",
+			r.Method,
+			r.URL.Path,
+			r.URL.Query().Encode(), // параметры запроса (?id=123&...)
+			r.RemoteAddr,
+		)
+
+		// Вызываем следующий обработчик в цепочке
+		next.ServeHTTP(w, r)
+
+		// После обработки запроса логируем длительность
+		log.Printf(
+			"[%s] %s completed in %v",
+			r.Method,
+			r.URL.Path,
+			time.Since(start),
+		)
+	})
 }
